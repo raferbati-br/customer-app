@@ -1,0 +1,61 @@
+
+services:
+
+  postgres:
+    image: postgres:15
+    container_name: customers-postgres
+    environment:
+      POSTGRES_DB: customersdb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: customers-rabbit
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+  customer-service:
+    build: ./customer-service
+    container_name: customer-service
+    depends_on:
+      - postgres
+      - rabbitmq
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/customersdb
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+
+    ports:
+      - "8080:8080"
+
+  audit-service:
+    build: ./audit-service
+    container_name: audit-service
+    depends_on:
+      - rabbitmq
+    environment:
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_AMQP_DESERIALIZATION_TRUST_ALL: "true"
+    ports:
+      - "8081:8081"
+
+  frontend:
+    build: ./customer-frontend
+    container_name: customer-frontend
+    depends_on:
+      - customer-service
+    ports:
+      - "5173:5173"
+
+volumes:
+  postgres_data:

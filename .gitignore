@@ -1,0 +1,21 @@
+# === Java / Maven ===
+target/
+*.log
+
+# === Node / React ===
+node_modules/
+dist/
+
+# === Docker ===
+*.tar
+
+# === IDE ===
+.vscode/
+.idea/
+
+# === OS ===
+.DS_Store
+Thumbs.db
+
+# === Env files ===
+.env
