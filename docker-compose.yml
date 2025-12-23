@@ -1,4 +1,3 @@
-
 services:
 
   postgres:
@@ -12,6 +11,11 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d customersdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
 
   rabbitmq:
     image: rabbitmq:3-management
@@ -19,13 +23,37 @@ services:
     ports:
       - "5672:5672"
       - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  postgres_audit:
+    image: postgres:16
+    container_name: postgres_audit
+    environment:
+      POSTGRES_DB: auditdb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_audit_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d auditdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
 
   customer-service:
     build: ./customer-service
     container_name: customer-service
     depends_on:
-      - postgres
-      - rabbitmq
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/customersdb
       SPRING_DATASOURCE_USERNAME: postgres
@@ -33,7 +61,8 @@ services:
 
       SPRING_RABBITMQ_HOST: rabbitmq
       SPRING_RABBITMQ_PORT: 5672
-
+      SPRING_RABBITMQ_USERNAME: guest
+      SPRING_RABBITMQ_PASSWORD: guest
     ports:
       - "8080:8080"
 
@@ -41,11 +70,19 @@ services:
     build: ./audit-service
     container_name: audit-service
     depends_on:
-      - rabbitmq
+      postgres_audit:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres_audit:5432/auditdb
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+
       SPRING_RABBITMQ_HOST: rabbitmq
       SPRING_RABBITMQ_PORT: 5672
-      SPRING_AMQP_DESERIALIZATION_TRUST_ALL: "true"
+      SPRING_RABBITMQ_USERNAME: guest
+      SPRING_RABBITMQ_PASSWORD: guest
     ports:
       - "8081:8081"
 
@@ -56,6 +93,13 @@ services:
       - customer-service
     ports:
       - "5173:5173"
+    volumes:
+      - ./customer-frontend:/app      # 1. Espelha sua pasta local para dentro do container
+      - /app/node_modules             # 2. "Protege" a pasta node_modules do container (truque essencial!)
+    environment:
+      # Se você usar variáveis de ambiente no front, declare aqui:
+      - VITE_API_URL=http://localhost:8080
 
 volumes:
   postgres_data:
+  postgres_audit_data:
