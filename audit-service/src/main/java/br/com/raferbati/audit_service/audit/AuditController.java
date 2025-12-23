@@ -5,7 +5,8 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/audit")
-@CrossOrigin(origins = "http://localhost:5173")
+// CORREÇÃO AQUI: Usamos chaves {} para permitir múltiplas origens
+@CrossOrigin(origins = {"http://localhost:5173", "http://localhost:5174"}) 
 public class AuditController {
 
     private final AuditService service;
@@ -16,7 +17,6 @@ public class AuditController {
 
     @GetMapping
     public List<AuditLog> list() {
-        // O Controller não precisa saber que a ordenação é DESC, o Service decide isso
         return service.findAll();
     }
 }
